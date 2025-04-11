@@ -6,6 +6,8 @@
     <title>BHL QuickStatements Generator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext x='0' y='14' font-size='16'%3E📚%3C/text%3E%3C/svg%3E">
 </head>
 
 <body>
@@ -13,6 +15,19 @@
         <div class="card shadow-sm">
             <div class="card-body">
                 <h2 class="mb-3">📚 BHL QuickStatements Generator</h2>
+
+                <!-- Display flashed messages (errors, warnings, etc.) -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+
                 <form method="get" class="mb-3">
                     <div class="input-group">
                         <input type="text" name="bhl" class="form-control" placeholder="Enter BHL Title ID or DOI"
@@ -21,17 +36,11 @@
                     </div>
                 </form>
 
-                {% if existing_item %}
-                <div class="alert alert-info mt-3">
-                    <strong>Existing Wikidata item found:</strong>
-                    <a href="{{ existing_item.url }}" target="_blank">{{ existing_item.label or existing_item.qid }}</a>
-                </div>
-                {% endif %}
                 {% if title_id %}
                 <h4 class="mt-4">Results for BHL Title ID: <strong>{{ title_id }}</strong></h4>
                 {% if error %}
                 <div class="alert alert-warning">{{ error }}</div>
-                {% else %}
+                {% elif title_data is defined and title_data %}
                 <p><strong>Title:</strong> {{ title_data.FullTitle }}</p>
                 <div class="form-group">
                     <label><strong>QuickStatements:</strong></label>
@@ -43,17 +52,17 @@
 
                 <hr class="my-4">
                 <h5>ℹ️ Additional Tools</h5>
-
-                This is not the first tool to try and generate QuickStatements for BHL items; each one has slightly
-                different features.
-                Here are some other tools that you may use:
+                <p>
+                    This is not the first tool to try and generate QuickStatements for BHL items; each one has slightly
+                    different features. Here are some other tools that you may use:
+                </p>
                 <ul>
                     <li>
-                        Rod Page's bhl2wiki, the long time default for adding <strong>BHL DOIs</strong> to Wikidata, use
+                        Rod Page's bhl2wiki, the longtime default for adding <strong>BHL DOIs</strong> to Wikidata. Use
                         <a href="https://bhl2wiki.herokuapp.com/" target="_blank">bhl2wiki</a>.
                     </li>
                     <li>
-                        The general powertool for generating items for articles on Wikidata:
+                        The general power tool for generating items for articles on Wikidata:
                         <a href="https://scholia.toolforge.org/id-to-quickstatements" target="_blank">Scholia ID to
                             QuickStatements</a>.
                     </li>
@@ -61,6 +70,17 @@
             </div>
         </div>
     </div>
+
+    <!-- Fun Footer -->
+    <footer class="text-center py-3 mt-4" style="background-color: #f8f9fa;">
+        <p class="mb-0">
+            Built by <a href="https://tiago.bio.br" target="_blank">Tiago Lubiana</a> |
+            <a href="https://github.com/lubianat/bhl-qs-generator" target="_blank">View Source on GitHub</a>
+        </p>
+    </footer>
+
+    <!-- Bootstrap JS (for dismissible alerts) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

@@ -1,10 +1,12 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, flash
+from markupsafe import Markup
 from login import BHL_API_KEY
 from wdcuration import lookup_id, render_qs_url
 import requests
 import re
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = "your-secret-key"  # Required for flash messages
 
 BHL_TITLE_METADATA_URL = (
     "https://www.biodiversitylibrary.org/api3"
@@ -23,9 +25,16 @@ def parse_bhl_title_id(input_str):
 
 
 def get_bhl_title_metadata(title_id):
+    """Fetch metadata and gracefully return None if no result is found."""
     response = requests.get(BHL_TITLE_METADATA_URL.format(title_id=title_id))
-    if response.ok and response.json().get("Status") == "ok":
-        return response.json()["Result"][0]
+    if response.ok:
+        data = response.json()
+        if (
+            data.get("Status") == "ok"
+            and data.get("Result")
+            and len(data["Result"]) > 0
+        ):
+            return data["Result"][0]
     return None
 
 
@@ -36,16 +45,11 @@ def generate_title_quickstatements(title_data):
     bhl_title_id = title_data.get("TitleID", "")
     title_url = f"https://www.biodiversitylibrary.org/bibliography/{bhl_title_id}"
 
-    # Create the new Wikidata item for the title
     commands.append("CREATE")
     commands.append(f'LAST|Lmul|"{full_title}"')
     commands.append(f'LAST|Den|"title in the Biodiversity Heritage Library collection"')
-
-    # Set instance of bibliographic work (Q47461344); adjust if needed
     commands.append("LAST|P31|Q47461344")
-    # Add the BHL Title ID (property P4327)
     commands.append(f'LAST|P4327|"{bhl_title_id}"')
-    # Add the reference URL
     commands.append(f'LAST|P953|"{title_url}"')
 
     for identifier in title_data.get("Identifiers", []):
@@ -61,7 +65,6 @@ def generate_title_quickstatements(title_data):
             commands.append(
                 f'LAST|P243|"{identifier["IdentifierValue"].upper()}"|S854|"https://www.biodiversitylibrary.org/bibliography/{bhl_title_id}"'
             )
-    # Add authors as creators if available
     for author in title_data.get("Authors", []):
         author_qid = lookup_id(id=author["AuthorID"], property="P4081")
         author_name = author["Name"]
@@ -74,19 +77,18 @@ def generate_title_quickstatements(title_data):
             commands.append(
                 f'LAST|P2093|"{author_name}"|S854|"https://www.biodiversitylibrary.org/bibliography/{bhl_title_id}"'
             )
-
     return "\n".join(commands)
 
 
 def check_existing_wikidata_item(bhl_title_id):
     """
-    Checks Wikidata to see if an item with the given BHL Title ID (property P4327) already exists.
-    Returns a tuple (qid, label) if an item is found, or (None, None) otherwise.
+    Checks Wikidata to see if an item with the given BHL Title ID (property P4327) exists.
+    Returns a tuple (qid, label) if found, or (None, None) otherwise.
     """
     query = """
     SELECT ?item ?itemLabel WHERE {
       ?item wdt:P4327 "%s" .
-      SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],mul,en". }
     }
     """ % (
         bhl_title_id
@@ -99,9 +101,7 @@ def check_existing_wikidata_item(bhl_title_id):
         data = response.json()
         results = data.get("results", {}).get("bindings", [])
         if results:
-            item_url = results[0]["item"][
-                "value"
-            ]  # e.g., "http://www.wikidata.org/entity/Q123456"
+            item_url = results[0]["item"]["value"]
             qid = item_url.split("/")[-1]
             label = results[0].get("itemLabel", {}).get("value", "")
             return qid, label
@@ -114,19 +114,20 @@ def index():
     context = {}
     if bhl_input:
         title_id = parse_bhl_title_id(bhl_input)
-        # Check for an existing Wikidata item with this BHL Title ID.
+        context["title_id"] = title_id or "Invalid input"
+
+        # Check for existing Wikidata item.
         existing_qid, existing_label = check_existing_wikidata_item(title_id)
         if existing_qid:
+            error_msg = f'Item already exists: <a href="https://www.wikidata.org/wiki/{existing_qid}" target="_blank">{existing_label} (Q{existing_qid})</a>. Please check the item on Wikidata.'
+            context["error"] = Markup(error_msg)
             context["existing_item"] = {
                 "qid": existing_qid,
                 "label": existing_label,
                 "url": f"https://www.wikidata.org/wiki/{existing_qid}",
             }
-            context["error"] = (
-                f"Item already exists: {existing_label} (Q{existing_qid}). "
-                f"Please check the item on Wikidata."
-            )
             return render_template("index.html", **context)
+
         title_data = get_bhl_title_metadata(title_id)
         if title_data:
             quickstatements = generate_title_quickstatements(title_data)
@@ -136,13 +137,16 @@ def index():
                 quickstatements=quickstatements,
                 qs_url=qs_url,
             )
+        else:
+            error_msg = "No metadata found for this BHL Title ID. Please verify the ID and try again."
+            context["error"] = error_msg
+
     return render_template("index.html", **context)
 
 
-# New API endpoint:
+# API endpoint remains the same.
 @app.route("/api/quickstatements", methods=["GET"])
 def api_quickstatements():
-    """API endpoint that receives a BHL Title ID and returns the generated QuickStatements string in JSON."""
     raw_id = request.args.get("id", "").strip()
     if not raw_id:
         return jsonify({"error": "No id provided."}), 400
@@ -151,7 +155,6 @@ def api_quickstatements():
     if not title_id:
         return jsonify({"error": "Invalid id provided."}), 400
 
-    # Check if item already exists in Wikidata
     existing_qid, existing_label = check_existing_wikidata_item(title_id)
     if existing_qid:
         return (
@@ -166,9 +169,8 @@ def api_quickstatements():
         return jsonify({"error": "No metadata found for this BHL Title ID."}), 404
 
     quickstatements = generate_title_quickstatements(title_data)
-    # You can return a plain JSON response with the string.
     return jsonify({"quickstatements": quickstatements})
 
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(debug=True)
