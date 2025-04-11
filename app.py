@@ -192,4 +192,7 @@ def api_quickstatements():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Use the port that Railway provides via the PORT environment variable.
+    port = int(os.environ.get("PORT", 5000))
+    # Listen on all network interfaces.
+    app.run(host="0.0.0.0", port=port, debug=False)
