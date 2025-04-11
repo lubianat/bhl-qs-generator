@@ -1,12 +1,22 @@
 from flask import Flask, request, render_template, jsonify, flash
 from markupsafe import Markup
-from login import BHL_API_KEY
 from wdcuration import lookup_id, render_qs_url
 import requests
 import re
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "your-secret-key"  # Required for flash messages
+
+# If not login, load variables from environment (for Railway deployment)
+try:
+    from dotenv import load_dotenv
+    import os
+
+    load_dotenv()
+    BHL_API_KEY = os.getenv("BHL_API_KEY")
+except ImportError:
+    print("Warning: dotenv not installed. Please set BHL_API_KEY in your environment.")
+    pass
 
 BHL_TITLE_METADATA_URL = (
     "https://www.biodiversitylibrary.org/api3"

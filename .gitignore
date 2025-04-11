@@ -1,3 +1,4 @@
 login.py
 *pycache*
 env/
+.env
