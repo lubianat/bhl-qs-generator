@@ -3,20 +3,29 @@ from markupsafe import Markup
 from wdcuration import lookup_id, render_qs_url
 import requests
 import re
+import os
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "your-secret-key"  # Required for flash messages
 
-# If not login, load variables from environment (for Railway deployment)
+
+# Try to load variables from a .env file if the package is available.
 try:
     from dotenv import load_dotenv
-    import os
 
     load_dotenv()
-    BHL_API_KEY = os.getenv("BHL_API_KEY")
 except ImportError:
-    print("Warning: dotenv not installed. Please set BHL_API_KEY in your environment.")
-    pass
+    print(
+        "Warning: python-dotenv is not installed. Using system environment variables."
+    )
+
+# Get the API key from the environment (Railway injects shared variables automatically)
+BHL_API_KEY = os.getenv("BHL_API_KEY")
+if not BHL_API_KEY:
+    raise EnvironmentError(
+        "BHL_API_KEY is not defined. Please set it in your environment variables."
+    )
+
 
 BHL_TITLE_METADATA_URL = (
     "https://www.biodiversitylibrary.org/api3"
