@@ -96,7 +96,7 @@ def generate_title_quickstatements(title_data):
             commands.append(
                 f'LAST|P2093|"{author_name}"|S854|"https://www.biodiversitylibrary.org/bibliography/{bhl_title_id}"'
             )
-    return "\n".join(commands)
+    return "\n".join(commands) + "\n\n"
 
 
 def check_existing_wikidata_item(bhl_title_id):
