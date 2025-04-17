@@ -67,6 +67,26 @@
                             QuickStatements</a>.
                     </li>
                 </ul>
+
+                <hr class="my-4">
+                <h5>🔍 How is this different from Rod Page’s tool?</h5>
+                <p>
+                    Rod Page’s excellent <a href="https://bhl2wiki.herokuapp.com/" target="_blank">bhl2wiki</a> is
+                    the go-to tool for adding BHL DOIs to Wikidata. This tool is just slightly different:
+                </p>
+                <ul>
+                    <li>Built in Python/Flask</li>
+                    <li>Works for a single DOI at a time (Rod's tool support multiple DOIs at once)</li>
+                    <li>Looks up BHL authors reconciled to Wikidata via the BHL Author ID (<a
+                            href="https://www.wikidata.org/wiki/Property:P4081" target="_blank">P4081</a>)</li>
+                    <li>Adds also the BHL bibliography ID value (<a href="https://www.wikidata.org/wiki/Property:P4327"
+                            target="_blank">P4327</a>)</li>
+                    <li>Uses <a href="https://www.wikidata.org/wiki/Q47461344" target="_blank">"written work"</a> as the
+                        type</li>
+                    <li>Includes a small API at <code>/api/quickstatements</code></li>
+                    <li>Uses <code>Lmul</code> for multilingual titles</li>
+                </ul>
+
             </div>
         </div>
     </div>
