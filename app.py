@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, jsonify, flash
+from flask import Flask, request, render_template, jsonify, flash, redirect, url_for
 from markupsafe import Markup
 from wdcuration import lookup_id, render_qs_url
 import requests
@@ -33,6 +33,14 @@ BHL_TITLE_METADATA_URL = (
 )
 
 
+def is_non_bhl_doi(input_str):
+    doi_match = "10." in input_str
+    print(f"DOI match: {doi_match}")
+    if doi_match:
+        return not "10.5962" in input_str
+    return False
+
+
 def parse_bhl_title_id(input_str):
     match = re.search(r"bhl\.title\.(\d+)", input_str)
     if match:
@@ -40,6 +48,10 @@ def parse_bhl_title_id(input_str):
     if input_str.isdigit():
         return input_str
     match = re.search(r"(\d+)$", input_str)
+
+    if "/item/" in input_str or "/page/" in input_str or "/part/" in input_str:
+        # No match
+        return None
     return match.group(1) if match else None
 
 
@@ -130,37 +142,62 @@ def check_existing_wikidata_item(bhl_title_id):
 @app.route("/", methods=["GET"])
 def index():
     bhl_input = request.args.get("bhl", "").strip()
-    context = {}
+    from_redirect = request.args.get("from_redirect")  # flag to suppress re-flash
+
+    title_id = None
+    title_data = None
+    quickstatements = None
+    qs_url = None
+
     if bhl_input:
+        if is_non_bhl_doi(bhl_input) and not from_redirect:
+            flash(
+                Markup(
+                    'This DOI does not appear to be from BHL. Please try using <a href="https://scholia.toolforge.org/id-to-quickstatements" target="_blank">Scholia ID to QuickStatements</a> instead.'
+                ),
+                "warning",
+            )
+            return redirect(url_for("index", from_redirect=1))
+
         title_id = parse_bhl_title_id(bhl_input)
-        context["title_id"] = title_id or "Invalid input"
+        if not title_id and not from_redirect:
+            flash(
+                Markup(
+                    "This does not look like a valid BHL Title ID or BHL DOI. Please enter a numeric ID or a BHL DOI like <code>10.5962/bhl.title.12345</code>."
+                ),
+                "warning",
+            )
+            return redirect(url_for("index", from_redirect=1))
 
-        # Check for existing Wikidata item.
         existing_qid, existing_label = check_existing_wikidata_item(title_id)
-        if existing_qid:
-            error_msg = f'Item already exists: <a href="https://www.wikidata.org/wiki/{existing_qid}" target="_blank">{existing_label} (Q{existing_qid})</a>. Please check the item on Wikidata.'
-            context["error"] = Markup(error_msg)
-            context["existing_item"] = {
-                "qid": existing_qid,
-                "label": existing_label,
-                "url": f"https://www.wikidata.org/wiki/{existing_qid}",
-            }
-            return render_template("index.html", **context)
+        if existing_qid and not from_redirect:
+            flash(
+                Markup(
+                    f'Item already exists: <a href="https://www.wikidata.org/wiki/{existing_qid}" target="_blank">{existing_label} ({existing_qid})</a>. Please check the item on Wikidata.'
+                ),
+                "info",
+            )
+            return redirect(url_for("index", bhl=title_id, from_redirect=1))
 
-        title_data = get_bhl_title_metadata(title_id)
-        if title_data:
+        if not from_redirect:
+            title_data = get_bhl_title_metadata(title_id)
+            if not title_data:
+                flash(
+                    "No metadata found for this BHL Title ID. Please verify the ID and try again.",
+                    "danger",
+                )
+                return redirect(url_for("index", from_redirect=1))
+
             quickstatements = generate_title_quickstatements(title_data)
             qs_url = render_qs_url(quickstatements)
-            context.update(
-                title_data=title_data,
-                quickstatements=quickstatements,
-                qs_url=qs_url,
-            )
-        else:
-            error_msg = "No metadata found for this BHL Title ID. Please verify the ID and try again."
-            context["error"] = error_msg
 
-    return render_template("index.html", **context)
+    return render_template(
+        "index.html",
+        title_id=title_id,
+        title_data=title_data,
+        quickstatements=quickstatements,
+        qs_url=qs_url,
+    )
 
 
 # API endpoint remains the same.

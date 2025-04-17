@@ -38,9 +38,8 @@
 
                 {% if title_id %}
                 <h4 class="mt-4">Results for BHL Title ID: <strong>{{ title_id }}</strong></h4>
-                {% if error %}
-                <div class="alert alert-warning">{{ error }}</div>
-                {% elif title_data is defined and title_data %}
+
+                {% if title_data %}
                 <p><strong>Title:</strong> {{ title_data.FullTitle }}</p>
                 <div class="form-group">
                     <label><strong>QuickStatements:</strong></label>
@@ -49,6 +48,7 @@
                 <a href="{{ qs_url }}" target="_blank" class="btn btn-success mt-3">🔗 Open QuickStatements</a>
                 {% endif %}
                 {% endif %}
+
 
                 <hr class="my-4">
                 <h5>ℹ️ Additional Tools</h5>
